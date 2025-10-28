@@ -1,0 +1,179 @@
+// pages/api/reports/generate.js
+// Generates PDF report and emails to customer
+
+import { createClient } from '@supabase/supabase-js';
+import { Resend } from 'resend';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { auditId } = req.body;
+
+    // Get audit data
+    const { data: audit } = await supabase
+      .from('audits')
+      .select('*')
+      .eq('id', auditId)
+      .single();
+
+    if (!audit) {
+      return res.status(404).json({ error: 'Audit not found' });
+    }
+
+    // Get all leaks
+    const { data: leaks } = await supabase
+      .from('leaks')
+      .select('*')
+      .eq('audit_id', auditId)
+      .order('annual_cost', { ascending: false });
+
+    // Generate HTML report (you could convert this to PDF with puppeteer)
+    const reportHtml = generateReportHtml(audit, leaks || []);
+
+    // For MVP, just email HTML report
+    // In production, use puppeteer to generate PDF
+    await resend.emails.send({
+      from: process.env.FROM_EMAIL,
+      to: audit.email,
+      subject: `💰 Your SaaS Leak Report: $${audit.total_waste_found?.toLocaleString() || '0'} Found`,
+      html: reportHtml,
+    });
+
+    // Update audit with report sent status
+    await supabase
+      .from('audits')
+      .update({
+        report_url: 'email_sent',
+        metadata: { report_sent_at: new Date().toISOString() },
+      })
+      .eq('id', auditId);
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error generating report:', error);
+    res.status(500).json({ error: 'Failed to generate report' });
+  }
+}
+
+function generateReportHtml(audit, leaks) {
+  const totalWaste = parseFloat(audit.total_waste_found || 0);
+  const leaksByType = {
+    zombie: leaks.filter(l => l.leak_type === 'zombie'),
+    duplicate: leaks.filter(l => l.leak_type === 'duplicate'),
+    free_alternative: leaks.filter(l => l.leak_type === 'free_alternative'),
+    unused: leaks.filter(l => l.leak_type === 'unused'),
+  };
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 { color: #dc2626; font-size: 32px; }
+    h2 { color: #ea580c; font-size: 24px; margin-top: 30px; }
+    .summary {
+      background: #fee2e2;
+      border-left: 4px solid #dc2626;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .leak {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    .leak-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .merchant { font-weight: bold; font-size: 18px; }
+    .cost { color: #dc2626; font-size: 20px; font-weight: bold; }
+    .recommendation {
+      background: #ecfdf5;
+      border-left: 3px solid #10b981;
+      padding: 10px;
+      margin-top: 10px;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 2px solid #e5e7eb;
+      text-align: center;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔴 Your SaaS Leak Report</h1>
+  
+  <div class="summary">
+    <h2 style="margin-top:0;">Total Annual Waste Detected: $${totalWaste.toLocaleString()}</h2>
+    <p><strong>${leaks.length} leak(s) found</strong> across your SaaS subscriptions.</p>
+    <p>ROI on this $497 audit: <strong>${((totalWaste / 497) * 100).toFixed(0)}%</strong></p>
+  </div>
+
+  ${Object.entries(leaksByType).map(([type, typeLeaks]) => {
+    if (typeLeaks.length === 0) return '';
+    
+    const typeNames = {
+      zombie: '💀 Zombie Subscriptions',
+      duplicate: '🔄 Duplicate Tools',
+      free_alternative: '🆓 Paying for Free Software',
+      unused: '❌ Unused Subscriptions'
+    };
+
+    return `
+      <h2>${typeNames[type]}</h2>
+      ${typeLeaks.map(leak => `
+        <div class="leak">
+          <div class="leak-header">
+            <div class="merchant">${leak.merchant_name}</div>
+            <div class="cost">$${parseFloat(leak.annual_cost).toLocaleString()}/year</div>
+          </div>
+          <p>${leak.description}</p>
+          <div class="recommendation">
+            <strong>💡 Recommendation:</strong> ${leak.recommendation}
+          </div>
+        </div>
+      `).join('')}
+    `;
+  }).join('')}
+
+  <h2>🎯 Next Steps</h2>
+  <ol>
+    <li><strong>Cancel the leaks:</strong> Use the recommendations above to cancel or downgrade subscriptions</li>
+    <li><strong>Update payment methods:</strong> Remove old employee credit cards from vendor accounts</li>
+    <li><strong>Centralize SaaS management:</strong> Have all software purchases go through one approval process</li>
+    <li><strong>Set calendar reminders:</strong> Review all subscriptions quarterly</li>
+  </ol>
+
+  <div class="footer">
+    <p>This report was generated by <strong>LeakDetector</strong></p>
+    <p>Questions? Reply to this email.</p>
+  </div>
+</body>
+</html>
+  `;
+}
