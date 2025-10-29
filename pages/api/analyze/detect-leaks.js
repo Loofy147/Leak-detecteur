@@ -1,13 +1,9 @@
 // pages/api/analyze/detect-leaks.js
-const { createClient } = require('@supabase/supabase-js');
-const { detectRecurringCharges, analyzeWithAI } = require('../../../lib/transaction_helpers');
+import supabase from '../../../lib/services/supabase';
+import { detectRecurringCharges } from '../../../lib/recurring_charges';
+import { analyzeWithAI } from '../../../lib/ai_analyzer';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

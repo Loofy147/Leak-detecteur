@@ -1,24 +1,8 @@
 // pages/api/analyze/fetch-transactions.js
-const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
-const { createClient } = require('@supabase/supabase-js');
+import plaidClient from '../../../lib/services/plaid';
+import supabase from '../../../lib/services/supabase';
 
-const configuration = new Configuration({
-  basePath: PlaidEnvironments[process.env.PLAID_ENV],
-  baseOptions: {
-    headers: {
-      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
-      'PLAID-SECRET': process.env.PLAID_SECRET,
-    },
-  },
-});
-
-const plaidClient = new PlaidApi(configuration);
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -90,5 +74,3 @@ async function handler(req, res) {
     res.status(500).json({ error: 'Failed to fetch transactions' });
   }
 }
-
-module.exports = handler;

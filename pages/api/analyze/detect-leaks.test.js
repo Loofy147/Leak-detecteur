@@ -1,26 +1,17 @@
 // pages/api/analyze/detect-leaks.test.js
-const { createMocks } = require('node-mocks-http');
-const handler = require('./detect-leaks');
-const { detectRecurringCharges, analyzeWithAI } = require('../../../lib/transaction_helpers');
-const { createClient } = require('@supabase/supabase-js');
+import { createMocks } from 'node-mocks-http';
+import handler from './detect-leaks';
+import { detectRecurringCharges } from '../../../lib/recurring_charges';
+import { analyzeWithAI } from '../../../lib/ai_analyzer';
+import supabase from '../../../lib/services/supabase';
 
-jest.mock('../../../lib/transaction_helpers');
-jest.mock('@supabase/supabase-js');
+jest.mock('../../../lib/recurring_charges');
+jest.mock('../../../lib/ai_analyzer');
+jest.mock('../../../lib/services/supabase');
 
 describe('/api/analyze/detect-leaks', () => {
-  let mockSupabase;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSupabase = {
-      from: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      order: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockResolvedValue({}),
-      update: jest.fn().mockResolvedValue({}),
-    };
-    createClient.mockReturnValue(mockSupabase);
   });
 
   it('should return 405 if method is not POST', async () => {
@@ -35,7 +26,11 @@ describe('/api/analyze/detect-leaks', () => {
   });
 
   it('should return 500 if no transactions are found', async () => {
-    mockSupabase.order.mockResolvedValue({ data: [], error: null });
+    supabase.from.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      order: jest.fn().mockResolvedValue({ data: [], error: null }),
+    });
 
     const { req, res } = createMocks({
       method: 'POST',
@@ -49,7 +44,13 @@ describe('/api/analyze/detect-leaks', () => {
   });
 
   it('should successfully detect leaks and update the audit', async () => {
-    mockSupabase.order.mockResolvedValue({ data: [{ id: 1, amount: 10 }], error: null });
+    supabase.from.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      order: jest.fn().mockResolvedValue({ data: [{ id: 1, amount: 10 }], error: null }),
+      insert: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockReturnThis(),
+    });
     detectRecurringCharges.mockReturnValue([{ merchant: 'test', amount: 10 }]);
     analyzeWithAI.mockResolvedValue([{ merchant_name: 'test', annual_cost: 120 }]);
 
@@ -66,12 +67,17 @@ describe('/api/analyze/detect-leaks', () => {
       leaksFound: 1,
       totalWaste: 120,
     });
-    expect(mockSupabase.insert).toHaveBeenCalledTimes(1);
-    expect(mockSupabase.update).toHaveBeenCalledTimes(1);
+    expect(supabase.from).toHaveBeenCalledWith('leaks');
+    expect(supabase.from).toHaveBeenCalledWith('audits');
   });
 
   it('should handle cases where no leaks are found', async () => {
-    mockSupabase.order.mockResolvedValue({ data: [{ id: 1, amount: 10 }], error: null });
+    supabase.from.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      order: jest.fn().mockResolvedValue({ data: [{ id: 1, amount: 10 }], error: null }),
+      update: jest.fn().mockReturnThis(),
+    });
     detectRecurringCharges.mockReturnValue([]);
     analyzeWithAI.mockResolvedValue([]);
 
@@ -88,7 +94,7 @@ describe('/api/analyze/detect-leaks', () => {
       leaksFound: 0,
       totalWaste: 0,
     });
-    expect(mockSupabase.insert).not.toHaveBeenCalled();
-    expect(mockSupabase.update).toHaveBeenCalledTimes(1);
+    expect(supabase.from).not.toHaveBeenCalledWith('leaks');
+    expect(supabase.from).toHaveBeenCalledWith('audits');
   });
 });
