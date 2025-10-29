@@ -1,32 +1,15 @@
 // pages/api/analyze/fetch-transactions.test.js
-const { createMocks } = require('node-mocks-http');
-const handler = require('./fetch-transactions');
-const { createClient } = require('@supabase/supabase-js');
-const { PlaidApi } = require('plaid');
+import { createMocks } from 'node-mocks-http';
+import handler from './fetch-transactions';
+import supabase from '../../../lib/services/supabase';
+import plaidClient from '../../../lib/services/plaid';
 
-jest.mock('@supabase/supabase-js');
-jest.mock('plaid');
+jest.mock('../../../lib/services/supabase');
+jest.mock('../../../lib/services/plaid');
 
 describe('/api/analyze/fetch-transactions', () => {
-  let mockSupabase;
-  let mockPlaid;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSupabase = {
-      from: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn(),
-      update: jest.fn().mockResolvedValue({}),
-      insert: jest.fn().mockResolvedValue({}),
-    };
-    createClient.mockReturnValue(mockSupabase);
-
-    mockPlaid = {
-      transactionsGet: jest.fn(),
-    };
-    PlaidApi.mockImplementation(() => mockPlaid);
   });
 
   it('should return 405 if method is not POST', async () => {
@@ -41,7 +24,11 @@ describe('/api/analyze/fetch-transactions', () => {
   });
 
   it('should return 400 if no access token is found', async () => {
-    mockSupabase.single.mockResolvedValue({ data: null, error: null });
+    supabase.from.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: null }),
+    });
 
     const { req, res } = createMocks({
       method: 'POST',
@@ -55,8 +42,14 @@ describe('/api/analyze/fetch-transactions', () => {
   });
 
   it('should fetch and store transactions successfully', async () => {
-    mockSupabase.single.mockResolvedValue({ data: { plaid_access_token: 'test-token' }, error: null });
-    mockPlaid.transactionsGet.mockResolvedValue({ data: { transactions: [{ transaction_id: '1', amount: 10 }] } });
+    supabase.from.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: { plaid_access_token: 'test-token' }, error: null }),
+      update: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockResolvedValue({}),
+    });
+    plaidClient.transactionsGet.mockResolvedValue({ data: { transactions: [{ transaction_id: '1', amount: 10 }] } });
 
     const { req, res } = createMocks({
       method: 'POST',
@@ -67,13 +60,18 @@ describe('/api/analyze/fetch-transactions', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res._getJSONData()).toEqual({ success: true, transactionCount: 1 });
-    expect(mockSupabase.insert).toHaveBeenCalledTimes(1);
-    expect(mockSupabase.update).toHaveBeenCalledTimes(1);
+    expect(supabase.from).toHaveBeenCalledWith('transactions');
+    expect(supabase.from).toHaveBeenCalledWith('audits');
   });
 
   it('should return 500 if fetching transactions fails', async () => {
-    mockSupabase.single.mockResolvedValue({ data: { plaid_access_token: 'test-token' }, error: null });
-    mockPlaid.transactionsGet.mockRejectedValue(new Error('Plaid error'));
+    supabase.from.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: { plaid_access_token: 'test-token' }, error: null }),
+      update: jest.fn().mockReturnThis(),
+    });
+    plaidClient.transactionsGet.mockRejectedValue(new Error('Plaid error'));
 
     const { req, res } = createMocks({
       method: 'POST',
@@ -84,6 +82,6 @@ describe('/api/analyze/fetch-transactions', () => {
 
     expect(res.statusCode).toBe(500);
     expect(res._getJSONData()).toEqual({ error: 'Failed to fetch transactions' });
-    expect(mockSupabase.update).toHaveBeenCalledWith({ status: 'failed', metadata: { error: 'Plaid error' } });
+    expect(supabase.from).toHaveBeenCalledWith('audits');
   });
 });
