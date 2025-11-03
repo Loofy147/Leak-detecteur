@@ -1,6 +1,4 @@
 // pages/api/plaid/create-link-token.js
-// Creates a Plaid Link token for the user to connect their bank
-
 import { Products, CountryCode } from 'plaid';
 import plaidClient from '../../../lib/services/plaid';
 import supabase from '../../../lib/services/supabase';

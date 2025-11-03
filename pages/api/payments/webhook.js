@@ -4,6 +4,8 @@
 import { buffer } from 'micro';
 import stripe from '../../../lib/services/stripe';
 import supabase from '../../../lib/services/supabase';
+import resend from '../../../lib/services/resend';
+import { generateWelcomeEmailHtml } from '../../../lib/templates/welcome_email_template';
 
 export const config = {
   api: {
@@ -36,6 +38,7 @@ export default async function handler(req, res) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       const auditId = session.metadata.audit_id;
+      const userEmail = session.customer_email;
 
       // Update audit with payment info
       const { error: updateError } = await supabase
@@ -51,7 +54,21 @@ export default async function handler(req, res) {
       }
 
       // Send welcome email with Plaid link
-      // TODO: Implement email sending
+      try {
+        const welcomeHtml = generateWelcomeEmailHtml(
+          auditId,
+          process.env.NEXT_PUBLIC_APP_URL
+        );
+
+        await resend.emails.send({
+          from: process.env.FROM_EMAIL,
+          to: userEmail,
+          subject: 'Welcome to LeakDetector - Next Steps',
+          html: welcomeHtml,
+        });
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError);
+      }
     }
 
     res.status(200).json({ received: true });

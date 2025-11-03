@@ -1,6 +1,4 @@
 // pages/api/plaid/exchange-token.js
-// Exchanges public token for access token after user connects bank
-
 import plaidClient from '../../../lib/services/plaid';
 import supabase from '../../../lib/services/supabase';
 
