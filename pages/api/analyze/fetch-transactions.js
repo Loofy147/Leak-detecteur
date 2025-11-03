@@ -1,15 +1,14 @@
 // pages/api/analyze/fetch-transactions.js
-import plaidClient from '../../../lib/services/plaid';
+import { plaidCircuit } from '../../../lib/errors/circuitBreaker';
+import { ErrorHandler } from '../../../lib/errors/errorHandler';
+import { APIOptimizer } from '../../../lib/optimization/apiOptimizer';
 import supabase from '../../../lib/services/supabase';
+import { withSecurity } from '../../../lib/security/middleware';
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+async function handler(req, res) {
+  const { auditId } = req.body;
 
   try {
-    const { auditId } = req.body;
-
     // Get audit with access token
     const { data: audit } = await supabase
       .from('audits')
@@ -33,13 +32,13 @@ export default async function handler(req, res) {
       .toISOString()
       .split('T')[0];
 
-    const transactionsResponse = await plaidClient.transactionsGet({
-      access_token: audit.plaid_access_token,
-      start_date: startDate,
-      end_date: endDate,
-    });
-
-    const transactions = transactionsResponse.data.transactions;
+    const transactions = await plaidCircuit.execute(() =>
+      APIOptimizer.fetchTransactionsOptimized(
+        audit.plaid_access_token,
+        startDate,
+        endDate
+      )
+    );
 
     // Store transactions in database
     const txInserts = transactions.map(tx => ({
@@ -64,13 +63,13 @@ export default async function handler(req, res) {
 
     res.status(200).json({ success: true, transactionCount: transactions.length });
   } catch (error) {
-    console.error('Error fetching transactions:', error);
-
+    await ErrorHandler.handle(error, { auditId });
     await supabase
       .from('audits')
       .update({ status: 'failed', metadata: { error: error.message } })
       .eq('id', req.body.auditId);
-
     res.status(500).json({ error: 'Failed to fetch transactions' });
   }
 }
+
+export default withSecurity(handler);

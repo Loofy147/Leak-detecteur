@@ -37,7 +37,8 @@ describe('Stripe Webhook Handler', () => {
 
     const { req, res } = createMocks({
       method: 'POST',
-      headers: { 'stripe-signature': 'sig_test' },
+      headers: { 'stripe-signature': 'sig_test', 'Content-Type': 'application/json' },
+      connection: { remoteAddress: '127.0.0.1' },
     });
 
     await webhookHandler(req, res);
