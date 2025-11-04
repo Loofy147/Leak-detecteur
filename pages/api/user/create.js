@@ -1,4 +1,8 @@
 
+/**
+ * @fileoverview API endpoint for creating a new user and a corresponding audit.
+ * This is the first step in the user onboarding process.
+ */
 import supabase from '../../../lib/services/supabase';
 import resend from '../../../lib/services/resend';
 import { withValidation } from '../../../lib/security/middleware';
@@ -8,6 +12,20 @@ const schema = Joi.object({
   email: Joi.string().email().required(),
 });
 
+/**
+ * Handles the creation of a new user and an associated audit.
+ *
+ * This function performs the following steps:
+ * 1. Creates a new user in the Supabase `users` table with the provided email.
+ * 2. Creates a new audit in the `audits` table, linking it to the newly created user.
+ * 3. Sends a welcome email to the user with a payment link to begin the audit process.
+ *
+ * @param {import('next').NextApiRequest} req - The Next.js API request object.
+ * @param {object} req.body - The request body.
+ * @param {string} req.body.email - The email address of the new user.
+ * @param {import('next').NextApiResponse} res - The Next.js API response object.
+ * @returns {Promise<void>} A promise that resolves when the response has been sent.
+ */
 async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -60,4 +78,10 @@ async function handler(req, res) {
   res.status(201).json({ userId: user.id, auditId: audit.id });
 }
 
+/**
+ * Wraps the handler function with validation middleware.
+ * This ensures that incoming requests have a valid body before the main handler logic is executed.
+ * @param {import('next').NextApiRequest} req - The Next.js API request object.
+ * @param {import('next').NextApiResponse} res - The Next.js API response object.
+ */
 export default withValidation(schema)(handler);

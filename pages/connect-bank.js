@@ -1,8 +1,18 @@
-// pages/connect-bank.js
+/**
+ * @fileoverview This page handles the Plaid Link flow for connecting a user's bank account.
+ * It retrieves a Plaid Link token, initializes the Plaid Link component, and handles the
+ * success callback to exchange the public token for an access token.
+ */
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 
+/**
+ * A React component that manages the Plaid Link integration.
+ * It fetches a Plaid Link token, opens the Plaid Link modal, and handles the token exchange
+ * on a successful connection.
+ * @returns {JSX.Element} The rendered ConnectBank component.
+ */
 export default function ConnectBank() {
   const router = useRouter();
   const { audit_id: auditId } = router.query;

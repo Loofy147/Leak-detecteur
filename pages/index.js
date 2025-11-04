@@ -1,7 +1,18 @@
 
+/**
+ * @fileoverview This is the main landing page for the LeakDetector application.
+ * It includes the primary call-to-action for users to start the audit process,
+ * as well as informational sections about the service.
+ */
 import React, { useState, useEffect } from 'react';
 import { DollarSign, TrendingDown, AlertCircle, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
 
+/**
+ * The main landing page component.
+ * It handles the initial user interaction, including email and company name input,
+ * and initiates the audit process by calling the user creation API.
+ * @returns {JSX.Element} The rendered LeakDetectorLanding component.
+ */
 export default function LeakDetectorLanding() {
   const [email, setEmail] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -255,6 +266,13 @@ export default function LeakDetectorLanding() {
   );
 }
 
+/**
+ * A component that displays a message to the user after their payment has been received,
+ * instructing them to check their email to connect their bank account.
+ * @param {object} props - The component props.
+ * @param {string} props.auditId - The ID of the audit.
+ * @returns {JSX.Element} The rendered ConnectBankScreen component.
+ */
 function ConnectBankScreen({ auditId }) {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -272,6 +290,11 @@ function ConnectBankScreen({ auditId }) {
   );
 }
 
+/**
+ * A component that displays a success message to the user after the analysis is complete,
+ * informing them that their report has been emailed.
+ * @returns {JSX.Element} The rendered SuccessScreen component.
+ */
 function SuccessScreen() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

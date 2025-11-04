@@ -7,11 +7,15 @@ import Joi from 'joi';
 import stripe from '../../../lib/services/stripe';
 import supabase from '../../../lib/services/supabase';
 import { withValidation } from '../../../lib/security/middleware';
+import { ErrorHandler } from '../../../lib/errors/errorHandler';
+import CircuitBreaker from '../../../lib/errors/circuitBreaker';
 
 const checkoutSchema = Joi.object({
   email: Joi.string().email().required(),
   companyName: Joi.string().optional(),
 });
+
+const stripeCircuit = new CircuitBreaker(stripe.checkout.sessions.create);
 
 /**
  * Handles the creation of a Stripe Checkout session.
@@ -81,4 +85,10 @@ async function handler(req, res) {
   }
 }
 
+/**
+ * Wraps the handler function with validation middleware.
+ * This ensures that incoming requests have a valid body before the main handler logic is executed.
+ * @param {import('next').NextApiRequest} req - The Next.js API request object.
+ * @param {import('next').NextApiResponse} res - The Next.js API response object.
+ */
 export default withValidation(checkoutSchema)(handler);

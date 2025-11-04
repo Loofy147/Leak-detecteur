@@ -31,10 +31,13 @@ export const config = {
  * @param {import('http').ServerResponse} res - The Node.js HTTP server response object.
  * @returns {Promise<void>} A promise that resolves when the response has been sent.
  */
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const buf = await buffer(req);
+  const sig = req.headers['stripe-signature'];
 
   let event;
   try {
@@ -88,4 +91,4 @@ export default async function handler(req, res) {
   res.status(200).json({ received: true });
 }
 
-export default withSecurity(handler, { rateLimitAction: null });
+export default handler;
