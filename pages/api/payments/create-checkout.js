@@ -55,26 +55,28 @@ async function handler(req, res) {
     }
 
     // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID, // $497 one-time price ID
-          quantity: 1,
+    const session = await stripeCircuit.execute(() =>
+      stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: process.env.STRIPE_PRICE_ID, // $497 one-time price ID
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        customer_email: email,
+        success_url: `${process.env.NEXT_PUBLIC_APP_URL}/success?audit_id=${audit.id}`,
+        cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}`,
+        metadata: {
+          audit_id: audit.id,
         },
-      ],
-      mode: 'payment',
-      customer_email: email,
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/success?audit_id=${audit.id}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}`,
-      metadata: {
-        audit_id: audit.id,
-      },
-    });
+      })
+    );
 
     res.status(200).json({ sessionId: session.id, auditId: audit.id });
   } catch (error) {
-    console.error('Error creating checkout session:', error);
+    await ErrorHandler.handle(error, { email });
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
 }

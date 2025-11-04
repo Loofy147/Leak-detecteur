@@ -82,6 +82,28 @@ async function handler(req, res) {
     console.error('Error detecting leaks:', error);
     res.status(500).json({ error: 'Failed to detect leaks' });
   }
+
+  // 4. CALCULATE TOTAL WASTE
+  const totalWaste = leaks.reduce((sum, leak) => sum + parseFloat(leak.annual_cost), 0);
+
+  // 5. UPDATE AUDIT STATUS
+  await supabase
+    .from('audits')
+    .update({
+      status: 'completed',
+      total_waste_found: totalWaste,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', auditId);
+
+  // 6. TRIGGER REPORT GENERATION
+  fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/reports/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ auditId }),
+  }).catch(err => console.error('Failed to trigger report generation:', err));
+
+  res.status(200).json({ success: true, leaksFound: leaks.length, totalWaste });
 }
 
 function wrappedHandler(req, res) {

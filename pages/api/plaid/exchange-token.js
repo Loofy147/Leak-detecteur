@@ -72,6 +72,15 @@ async function handler(req, res) {
     console.error('Error exchanging token:', error);
     res.status(500).json({ error: 'Failed to exchange token' });
   }
+
+  // Trigger transaction fetch (async)
+  fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/analyze/fetch-transactions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ auditId }),
+  }).catch(err => console.error('Failed to trigger transaction fetch:', err));
+
+  res.status(200).json({ success: true });
 }
 
 export default withValidation(exchangeTokenSchema)(handler);
