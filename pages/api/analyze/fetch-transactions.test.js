@@ -10,32 +10,29 @@ jest.mock('../../../lib/services/plaid');
 describe('/api/analyze/fetch-transactions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    const fromMock = jest.fn().mockImplementation(tableName => {
-      if (tableName === 'rate_limits') {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          gte: jest.fn().mockResolvedValue({ data: [], error: null }),
-          insert: jest.fn().mockResolvedValue({}),
-        };
-      }
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ data: null, error: null }),
-        update: jest.fn().mockReturnThis(),
-        insert: jest.fn().mockResolvedValue({}),
-      };
+  });
+
+  it('should return 405 if method is not POST', async () => {
+    const { req, res } = createMocks({
+      method: 'GET',
     });
-    supabase.from = fromMock;
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(405);
+    expect(res._getJSONData()).toEqual({ error: 'Method not allowed' });
   });
 
   it('should return 400 if no access token is found', async () => {
+    supabase.from.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: null }),
+    });
+
     const { req, res } = createMocks({
       method: 'POST',
       body: { auditId: 'test-audit' },
-      headers: { 'Content-Type': 'application/json' },
-      connection: { remoteAddress: '127.0.0.1' },
     });
 
     await handler(req, res);
@@ -45,76 +42,46 @@ describe('/api/analyze/fetch-transactions', () => {
   });
 
   it('should fetch and store transactions successfully', async () => {
-    supabase.from.mockImplementation(tableName => {
-      if (tableName === 'rate_limits') {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          gte: jest.fn().mockResolvedValue({ data: [], error: null }),
-          insert: jest.fn().mockResolvedValue({}),
-        };
-      }
-      if (tableName === 'audits') {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          single: jest.fn().mockResolvedValue({ data: { plaid_access_token: 'test-token' }, error: null }),
-          update: jest.fn().mockReturnThis(),
-        };
-      }
-      return {
-        insert: jest.fn().mockResolvedValue({}),
-      };
+    supabase.from.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: { plaid_access_token: 'test-token' }, error: null }),
+      update: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockResolvedValue({}),
     });
-
     plaidClient.transactionsGet.mockResolvedValue({ data: { transactions: [{ transaction_id: '1', amount: 10 }] } });
 
     const { req, res } = createMocks({
       method: 'POST',
       body: { auditId: 'test-audit' },
-      headers: { 'Content-Type': 'application/json' },
-      connection: { remoteAddress: '127.0.0.1' },
     });
 
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
     expect(res._getJSONData()).toEqual({ success: true, transactionCount: 1 });
+    expect(supabase.from).toHaveBeenCalledWith('transactions');
+    expect(supabase.from).toHaveBeenCalledWith('audits');
   });
 
   it('should return 500 if fetching transactions fails', async () => {
-    supabase.from.mockImplementation(tableName => {
-      if (tableName === 'rate_limits') {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          gte: jest.fn().mockResolvedValue({ data: [], error: null }),
-          insert: jest.fn().mockResolvedValue({}),
-        };
-      }
-      if (tableName === 'audits') {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          single: jest.fn().mockResolvedValue({ data: { plaid_access_token: 'test-token' }, error: null }),
-          update: jest.fn().mockReturnThis(),
-        };
-      }
-      return {};
+    supabase.from.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: { plaid_access_token: 'test-token' }, error: null }),
+      update: jest.fn().mockReturnThis(),
     });
-
     plaidClient.transactionsGet.mockRejectedValue(new Error('Plaid error'));
 
     const { req, res } = createMocks({
       method: 'POST',
       body: { auditId: 'test-audit' },
-      headers: { 'Content-Type': 'application/json' },
-      connection: { remoteAddress: '127.0.0.1' },
     });
 
     await handler(req, res);
 
     expect(res.statusCode).toBe(500);
     expect(res._getJSONData()).toEqual({ error: 'Failed to fetch transactions' });
+    expect(supabase.from).toHaveBeenCalledWith('audits');
   });
 });
