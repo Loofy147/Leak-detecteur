@@ -1,35 +1,76 @@
-// pages/api/plaid/exchange-token.js
+/**
+ * @fileoverview This API endpoint exchanges a Plaid public token for an access token.
+ * This is the final step in the Plaid Link flow, securing the user's bank connection.
+ */
+
+import Joi from 'joi';
 import plaidClient from '../../../lib/services/plaid';
 import supabase from '../../../lib/services/supabase';
-import { withSecurity } from '../../../lib/security/middleware';
+import { withValidation } from '../../../lib/security/middleware';
 
+const exchangeTokenSchema = Joi.object({
+  public_token: Joi.string().required(),
+  auditId: Joi.string().uuid().required(),
+});
+
+/**
+ * Handles the exchange of a Plaid public token for an access token.
+ *
+ * This function performs the following steps:
+ * 1. Receives a `public_token` and `auditId` from the client after a successful Plaid Link connection.
+ * 2. Exchanges the `public_token` for a permanent `access_token` and `item_id` using the Plaid API.
+ * 3. Securely stores the `access_token` and `item_id` in the Supabase database, updating the audit status to 'bank_connected'.
+ * 4. Asynchronously triggers the `fetch-transactions` endpoint to begin the process of fetching the user's transaction history.
+ * 5. Returns a success response to the client.
+ *
+ * @param {import('next').NextApiRequest} req - The Next.js API request object.
+ * @param {object} req.body - The request body.
+ * @param {string} req.body.public_token - The temporary public token obtained from the Plaid Link flow.
+ * @param {string} req.body.auditId - The unique identifier for the audit session.
+ * @param {import('next').NextApiResponse} res - The Next.js API response object.
+ * @returns {Promise<void>} A promise that resolves when the response has been sent.
+ */
 async function handler(req, res) {
-  const { public_token, auditId } = req.body;
-
-  if (!public_token || !auditId) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Exchange public token for access token
-  const exchangeResponse = await plaidClient.itemPublicTokenExchange({
-    public_token,
-  });
+  try {
+    const { public_token, auditId } = req.body;
 
-  const accessToken = exchangeResponse.data.access_token;
-  const itemId = exchangeResponse.data.item_id;
+    // Exchange public token for access token
+    const exchangeResponse = await plaidClient.itemPublicTokenExchange({
+      public_token,
+    });
 
-  // Store access token in database
-  const { error: updateError } = await supabase
-    .from('audits')
-    .update({
-      plaid_access_token: accessToken,
-      plaid_item_id: itemId,
-      status: 'bank_connected',
-    })
-    .eq('id', auditId);
+    const accessToken = exchangeResponse.data.access_token;
+    const itemId = exchangeResponse.data.item_id;
 
-  if (updateError) {
-    throw updateError;
+    // Store access token in database
+    const { error: updateError } = await supabase
+      .from('audits')
+      .update({
+        plaid_access_token: accessToken,
+        plaid_item_id: itemId,
+        status: 'bank_connected',
+      })
+      .eq('id', auditId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Trigger transaction fetch (async)
+    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/analyze/fetch-transactions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auditId }),
+    }).catch(err => console.error('Failed to trigger transaction fetch:', err));
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error exchanging token:', error);
+    res.status(500).json({ error: 'Failed to exchange token' });
   }
 
   // Trigger transaction fetch (async)
@@ -42,4 +83,4 @@ async function handler(req, res) {
   res.status(200).json({ success: true });
 }
 
-export default withSecurity(handler);
+export default withValidation(exchangeTokenSchema)(handler);

@@ -1,5 +1,7 @@
-// pages/api/payments/webhook.js
-// Handles Stripe webhook events (payment success)
+/**
+ * @fileoverview This API endpoint handles webhook events from Stripe.
+ * It is specifically designed to process the `checkout.session.completed` event to confirm successful payments.
+ */
 
 import { buffer } from 'micro';
 import stripe from '../../../lib/services/stripe';
@@ -14,9 +16,25 @@ export const config = {
   },
 };
 
-async function handler(req, res) {
-  const buf = await buffer(req);
-  const sig = req.headers['stripe-signature'];
+/**
+ * Handles incoming Stripe webhook events.
+ *
+ * This function performs the following actions:
+ * 1. Disables the default body parser to receive the raw request body for signature verification.
+ * 2. Verifies the authenticity of the webhook event using the Stripe signature.
+ * 3. Listens for the `checkout.session.completed` event, which indicates a successful payment.
+ * 4. Upon receiving this event, it extracts the `audit_id` from the session metadata.
+ * 5. Updates the corresponding audit record in the Supabase database to 'payment_received' and stores the payment intent ID.
+ * 6. Responds to Stripe with a success status to acknowledge receipt of the event.
+ *
+ * @param {import('micro').NextApiRequest} req - The Next.js API request object.
+ * @param {import('http').ServerResponse} res - The Node.js HTTP server response object.
+ * @returns {Promise<void>} A promise that resolves when the response has been sent.
+ */
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
   let event;
   try {

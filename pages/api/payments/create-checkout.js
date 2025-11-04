@@ -1,20 +1,43 @@
-// pages/api/payments/create-checkout.js
-// Creates Stripe checkout session for $497 one-time payment
+/**
+ * @fileoverview This API endpoint creates a Stripe Checkout session for a one-time payment.
+ * It also creates a corresponding audit record in the database, which is initially marked as 'pending_payment'.
+ */
 
+import Joi from 'joi';
 import stripe from '../../../lib/services/stripe';
 import supabase from '../../../lib/services/supabase';
-import { withSecurity } from '../../../lib/security/middleware';
-import { stripeCircuit } from '../../../lib/errors/circuitBreaker';
-import { ErrorHandler } from '../../../lib/errors/errorHandler';
+import { withValidation } from '../../../lib/security/middleware';
 
+const checkoutSchema = Joi.object({
+  email: Joi.string().email().required(),
+  companyName: Joi.string().optional(),
+});
+
+/**
+ * Handles the creation of a Stripe Checkout session.
+ *
+ * This function performs the following actions:
+ * 1. Validates that the request includes an email address.
+ * 2. Creates a new audit record in the Supabase database with a status of 'pending_payment'.
+ * 3. Creates a Stripe Checkout session for a one-time payment, associating it with the newly created audit.
+ * 4. Sets the success and cancel URLs for the checkout flow, passing the `audit_id` as a query parameter in the success URL.
+ * 5. Returns the Stripe session ID and the audit ID to the client.
+ *
+ * @param {import('next').NextApiRequest} req - The Next.js API request object.
+ * @param {object} req.body - The request body.
+ * @param {string} req.body.email - The customer's email address.
+ * @param {string} [req.body.companyName] - The customer's company name (optional).
+ * @param {import('next').NextApiResponse} res - The Next.js API response object.
+ * @returns {Promise<void>} A promise that resolves when the response has been sent.
+ */
 async function handler(req, res) {
-  const { email, companyName } = req.body;
-
-  if (!email) {
-    return res.status(400).json({ error: 'Email required' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
+    const { email, companyName } = req.body;
+
     // Create audit record (pending payment)
     const { data: audit, error: auditError } = await supabase
       .from('audits')
@@ -58,4 +81,4 @@ async function handler(req, res) {
   }
 }
 
-export default withSecurity(handler, { rateLimitAction: 'checkout' });
+export default withValidation(checkoutSchema)(handler);
