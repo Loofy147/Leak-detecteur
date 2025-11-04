@@ -16,6 +16,11 @@ const exchangeTokenSchema = Joi.object({
 });
 
 /**
+ * @fileoverview This API endpoint exchanges a Plaid public token for an access token.
+ * This is the final step in the Plaid Link flow, securing the user's bank connection.
+ */
+
+/**
  * Handles the exchange of a Plaid public token for an access token.
  *
  * This function performs the following steps:
@@ -92,4 +97,10 @@ async function handler(req, res) {
   }
 }
 
+/**
+ * Wraps the handler function with validation middleware.
+ * This ensures that incoming requests have a valid body before the main handler logic is executed.
+ * @param {import('next').NextApiRequest} req - The Next.js API request object.
+ * @param {import('next').NextApiResponse} res - The Next.js API response object.
+ */
 export default withValidation(exchangeTokenSchema)(handler);

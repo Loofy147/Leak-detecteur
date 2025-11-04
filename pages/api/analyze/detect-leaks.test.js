@@ -50,7 +50,7 @@ describe('/api/analyze/detect-leaks', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(500);
-    expect(res._getJSONData()).toEqual({ error: 'Internal server error', requestId: 'unknown' });
+    expect(res._getJSONData()).toEqual({ error: 'Failed to detect leaks' });
   });
 
   it('should successfully detect leaks and update the audit', async () => {

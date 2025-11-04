@@ -10,6 +10,18 @@ LeakDetector is a SaaS application that helps businesses identify and eliminate 
 - **Automated Reporting:** Generate and email a detailed report of the findings, including actionable recommendations.
 - **Stripe Integration:** Process one-time payments for the audit service.
 
+## Project Structure
+
+The project is a Next.js application with a serverless backend architecture. The key directories are:
+
+- **`pages/`**: Contains the frontend pages of the application.
+- **`pages/api/`**: Contains the backend API routes.
+- **`lib/`**: Contains the core business logic of the application, including services, error handling, and security.
+- **`lib/services/`**: Contains the clients for external services, such as Plaid, Stripe, and Supabase.
+- **`lib/errors/`**: Contains the error handling and circuit breaker logic.
+- **`lib/security/`**: Contains the security middleware, such as rate limiting and validation.
+- **`lib/templates/`**: Contains the templates for generating emails and reports.
+
 ## Architecture Overview
 
 This is a Next.js application with a serverless backend architecture. The key components are:
@@ -98,13 +110,14 @@ The application flow is as follows:
 
 1.  A user lands on the marketing page and clicks the "Get Your Audit" button.
 2.  They are prompted to enter their email address and company name.
-3.  They are redirected to a Stripe Checkout page to pay the one-time audit fee.
-4.  After a successful payment, they are redirected to a success page where they are prompted to connect their bank account using the Plaid Link flow.
-5.  Once they have connected their bank account, the application fetches the last 12 months of transaction data.
-6.  The transaction data is analyzed for recurring charges.
-7.  The recurring charges are sent to the Anthropic API for analysis to identify potential leaks.
-8.  The identified leaks are stored in the database.
-9.  A report is generated and emailed to the user.
+3.  A user and an audit record are created in the database.
+4.  The user is redirected to a Stripe Checkout page to pay the one-time audit fee.
+5.  After a successful payment, the user is redirected to a success page where they are prompted to connect their bank account using the Plaid Link flow.
+6.  Once they have connected their bank account, the application fetches the last 12 months of transaction data.
+7.  The transaction data is analyzed for recurring charges.
+8.  The recurring charges are sent to the Anthropic API for analysis to identify potential leaks.
+9.  The identified leaks are stored in the database.
+10. A report is generated and emailed to the user.
 
 ## Testing
 

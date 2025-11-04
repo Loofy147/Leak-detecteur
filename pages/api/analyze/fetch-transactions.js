@@ -7,10 +7,20 @@ import Joi from 'joi';
 import plaidClient from '../../../lib/services/plaid';
 import supabase from '../../../lib/services/supabase';
 import { withValidation } from '../../../lib/security/middleware';
+import { APIOptimizer } from '../../../lib/optimization/apiOptimizer';
+import { ErrorHandler } from '../../../lib/errors/errorHandler';
+import CircuitBreaker from '../../../lib/errors/circuitBreaker';
 
 const fetchTransactionsSchema = Joi.object({
   auditId: Joi.string().uuid().required(),
 });
+
+const plaidCircuit = new CircuitBreaker(APIOptimizer.fetchTransactionsOptimized);
+
+/**
+ * @fileoverview This API endpoint is responsible for fetching a user's transaction history from Plaid.
+ * It is the first step in the financial leak analysis process.
+ */
 
 /**
  * Handles the fetching and storing of transactions for a given audit.
@@ -29,6 +39,7 @@ const fetchTransactionsSchema = Joi.object({
  * @returns {Promise<void>} A promise that resolves when the response has been sent.
  */
 async function handler(req, res) {
+  const { auditId } = req.body;
   try {
     // Get audit with access token
     const { data: audit } = await supabase
@@ -53,7 +64,7 @@ async function handler(req, res) {
       .toISOString()
       .split('T')[0];
 
-    const transactions = await plaidCircuit.execute(() =>
+    const transactions = await plaidCircuit.fire(() =>
       APIOptimizer.fetchTransactionsOptimized(
         audit.plaid_access_token,
         startDate,
@@ -93,6 +104,13 @@ async function handler(req, res) {
   }
 }
 
+/**
+ * Wraps the handler function with validation middleware and a method check.
+ * This ensures that incoming requests have a valid body and are of the correct HTTP method
+ * before the main handler logic is executed.
+ * @param {import('next').NextApiRequest} req - The Next.js API request object.
+ * @param {import('next').NextApiResponse} res - The Next.js API response object.
+ */
 function wrappedHandler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
