@@ -1,20 +1,42 @@
-// pages/api/plaid/exchange-token.js
-// Exchanges public token for access token after user connects bank
+/**
+ * @fileoverview This API endpoint exchanges a Plaid public token for an access token.
+ * This is the final step in the Plaid Link flow, securing the user's bank connection.
+ */
 
+import Joi from 'joi';
 import plaidClient from '../../../lib/services/plaid';
 import supabase from '../../../lib/services/supabase';
+import { withValidation } from '../../../lib/security/middleware';
 
-export default async function handler(req, res) {
+const exchangeTokenSchema = Joi.object({
+  public_token: Joi.string().required(),
+  auditId: Joi.string().uuid().required(),
+});
+
+/**
+ * Handles the exchange of a Plaid public token for an access token.
+ *
+ * This function performs the following steps:
+ * 1. Receives a `public_token` and `auditId` from the client after a successful Plaid Link connection.
+ * 2. Exchanges the `public_token` for a permanent `access_token` and `item_id` using the Plaid API.
+ * 3. Securely stores the `access_token` and `item_id` in the Supabase database, updating the audit status to 'bank_connected'.
+ * 4. Asynchronously triggers the `fetch-transactions` endpoint to begin the process of fetching the user's transaction history.
+ * 5. Returns a success response to the client.
+ *
+ * @param {import('next').NextApiRequest} req - The Next.js API request object.
+ * @param {object} req.body - The request body.
+ * @param {string} req.body.public_token - The temporary public token obtained from the Plaid Link flow.
+ * @param {string} req.body.auditId - The unique identifier for the audit session.
+ * @param {import('next').NextApiResponse} res - The Next.js API response object.
+ * @returns {Promise<void>} A promise that resolves when the response has been sent.
+ */
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
     const { public_token, auditId } = req.body;
-
-    if (!public_token || !auditId) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
 
     // Exchange public token for access token
     const exchangeResponse = await plaidClient.itemPublicTokenExchange({
@@ -51,3 +73,5 @@ export default async function handler(req, res) {
     res.status(500).json({ error: 'Failed to exchange token' });
   }
 }
+
+export default withValidation(exchangeTokenSchema)(handler);

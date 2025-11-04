@@ -1,12 +1,34 @@
-// pages/api/analyze/fetch-transactions.js
+/**
+ * @fileoverview This API endpoint is responsible for fetching a user's transaction history from Plaid.
+ * It is the first step in the financial leak analysis process.
+ */
+
+import Joi from 'joi';
 import plaidClient from '../../../lib/services/plaid';
 import supabase from '../../../lib/services/supabase';
+import { withValidation } from '../../../lib/security/middleware';
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+const fetchTransactionsSchema = Joi.object({
+  auditId: Joi.string().uuid().required(),
+});
 
+/**
+ * Handles the fetching and storing of transactions for a given audit.
+ *
+ * This endpoint performs the following steps:
+ * 1. Retrieves the Plaid access token associated with the provided `auditId`.
+ * 2. Updates the audit status to 'analyzing'.
+ * 3. Fetches the last 12 months of transaction data from the Plaid API.
+ * 4. Formats and stores the fetched transactions in the Supabase database.
+ * 5. Asynchronously triggers the `detect-leaks` endpoint to start the analysis process.
+ *
+ * @param {import('next').NextApiRequest} req - The Next.js API request object.
+ * @param {object} req.body - The request body.
+ * @param {string} req.body.auditId - The unique identifier for the audit session.
+ * @param {import('next').NextApiResponse} res - The Next.js API response object.
+ * @returns {Promise<void>} A promise that resolves when the response has been sent.
+ */
+async function handler(req, res) {
   try {
     const { auditId } = req.body;
 
@@ -74,3 +96,12 @@ export default async function handler(req, res) {
     res.status(500).json({ error: 'Failed to fetch transactions' });
   }
 }
+
+function wrappedHandler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  return withValidation(fetchTransactionsSchema)(handler)(req, res);
+}
+
+export default wrappedHandler;
