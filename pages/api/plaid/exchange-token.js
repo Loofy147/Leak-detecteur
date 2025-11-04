@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview This API endpoint exchanges a Plaid public token for an access token.
  * This is the final step in the Plaid Link flow, securing the user's bank connection.
@@ -6,6 +7,7 @@
 import Joi from 'joi';
 import plaidClient from '../../../lib/services/plaid';
 import supabase from '../../../lib/services/supabase';
+import resend from '../../../lib/services/resend';
 import { withValidation } from '../../../lib/security/middleware';
 
 const exchangeTokenSchema = Joi.object({
@@ -46,18 +48,34 @@ async function handler(req, res) {
     const accessToken = exchangeResponse.data.access_token;
     const itemId = exchangeResponse.data.item_id;
 
-    // Store access token in database
-    const { error: updateError } = await supabase
+    // Store access token and update audit status
+    const { data: audit, error: updateError } = await supabase
       .from('audits')
       .update({
         plaid_access_token: accessToken,
         plaid_item_id: itemId,
         status: 'bank_connected',
       })
-      .eq('id', auditId);
+      .eq('id', auditId)
+      .select('*, user:users(*)')
+      .single();
 
     if (updateError) {
       throw updateError;
+    }
+
+    // Send confirmation email
+    if (audit && audit.user && audit.user.email) {
+      try {
+        await resend.emails.send({
+          from: 'support@leakdetector.com',
+          to: audit.user.email,
+          subject: 'Bank Account Connected!',
+          html: '<p>Your bank account has been successfully connected. We are now analyzing your transactions.</p>',
+        });
+      } catch (emailError) {
+        console.error('Error sending confirmation email:', emailError);
+      }
     }
 
     // Trigger transaction fetch (async)
@@ -72,15 +90,6 @@ async function handler(req, res) {
     console.error('Error exchanging token:', error);
     res.status(500).json({ error: 'Failed to exchange token' });
   }
-
-  // Trigger transaction fetch (async)
-  fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/analyze/fetch-transactions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ auditId }),
-  }).catch(err => console.error('Failed to trigger transaction fetch:', err));
-
-  res.status(200).json({ success: true });
 }
 
 export default withValidation(exchangeTokenSchema)(handler);

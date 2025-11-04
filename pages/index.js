@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { DollarSign, TrendingDown, AlertCircle, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
 
@@ -25,11 +26,11 @@ export default function LeakDetectorLanding() {
     setLoading(true);
     
     try {
-      // Create Stripe checkout session
-      const response = await fetch('/api/payments/create-checkout', {
+      // Create user and audit
+      const response = await fetch('/api/user/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, companyName }),
+        body: JSON.stringify({ email }),
       });
 
       const data = await response.json();
@@ -38,11 +39,8 @@ export default function LeakDetectorLanding() {
         throw new Error(data.error);
       }
 
-      // Redirect to Stripe Checkout
-      const stripe = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
-      await stripe.redirectToCheckout({ sessionId: data.sessionId });
-      
       setAuditId(data.auditId);
+      setStep('connect');
     } catch (error) {
       console.error('Error:', error);
       alert('Something went wrong. Please try again.');
