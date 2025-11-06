@@ -8,14 +8,14 @@ import stripe from '../../../lib/services/stripe';
 import supabase from '../../../lib/services/supabase';
 import { withValidation } from '../../../lib/security/middleware';
 import { ErrorHandler } from '../../../lib/errors/errorHandler';
-import CircuitBreaker from '../../../lib/errors/circuitBreaker';
+import PersistentCircuitBreaker from '../../../lib/errors/PersistentCircuitBreaker';
 
 const checkoutSchema = Joi.object({
   email: Joi.string().email().required(),
   companyName: Joi.string().optional(),
 });
 
-const stripeCircuit = new CircuitBreaker(stripe.checkout.sessions.create);
+const stripeCircuit = new PersistentCircuitBreaker('stripe_api', stripe.checkout.sessions.create);
 
 /**
  * Handles the creation of a Stripe Checkout session.

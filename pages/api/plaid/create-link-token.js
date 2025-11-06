@@ -6,7 +6,6 @@
 import { Products, CountryCode } from 'plaid';
 import plaidClient from '../../../lib/services/plaid';
 import supabase from '../../../lib/services/supabase';
-import { withSecurity } from '../../../lib/security/middleware';
 
 /**
  * Handles the creation of a Plaid Link token.

@@ -3,15 +3,28 @@ import { createMocks } from 'node-mocks-http';
 import webhookHandler from './webhook';
 import stripe from '../../../lib/services/stripe';
 import supabase from '../../../lib/services/supabase';
-import resend from '../../../lib/services/resend';
+import { addEmailToQueue } from '../../../lib/emailQueue';
 import { buffer } from 'micro';
 
 jest.mock('../../../lib/services/stripe');
-jest.mock('../../../lib/services/supabase');
-jest.mock('../../../lib/services/resend');
+jest.mock('../../../lib/services/supabase', () => ({
+  from: jest.fn().mockReturnThis(),
+  update: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  insert: jest.fn().mockReturnThis(),
+}));
+jest.mock('../../../lib/emailQueue');
 jest.mock('micro');
 
 describe('Stripe Webhook Handler', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    supabase.from.mockReturnThis();
+    supabase.update.mockReturnThis();
+    supabase.eq.mockReturnThis();
+    supabase.insert.mockReturnThis();
+  });
+
   it('should send a welcome email on checkout.session.completed', async () => {
     // Mock Stripe event
     const mockSession = {
@@ -28,13 +41,6 @@ describe('Stripe Webhook Handler', () => {
     stripe.webhooks.constructEvent.mockReturnValue(mockEvent);
     buffer.mockResolvedValue('rawBody');
 
-    // Mock Supabase and Resend
-    const updateMock = jest.fn().mockResolvedValue({ error: null });
-    const eqMock = jest.fn().mockReturnValue({ update: updateMock });
-    supabase.from.mockReturnValue({ update: jest.fn().mockReturnValue({ eq: eqMock }) });
-
-    resend.emails.send.mockResolvedValue({});
-
     const { req, res } = createMocks({
       method: 'POST',
       headers: { 'stripe-signature': 'sig_test', 'Content-Type': 'application/json' },
@@ -45,11 +51,11 @@ describe('Stripe Webhook Handler', () => {
 
     expect(res._getStatusCode()).toBe(200);
     expect(supabase.from).toHaveBeenCalledWith('audits');
-    expect(resend.emails.send).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: 'test@example.com',
-        subject: 'Welcome to LeakDetector - Next Steps',
-      })
+    expect(addEmailToQueue).toHaveBeenCalledWith(
+      'test@example.com',
+      process.env.FROM_EMAIL,
+      'Welcome to LeakDetector - Next Steps',
+      expect.any(String)
     );
   });
 });

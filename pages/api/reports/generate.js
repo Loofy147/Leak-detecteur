@@ -4,9 +4,8 @@
  */
 
 import supabase from '../../../lib/services/supabase';
-import resend from '../../../lib/services/resend';
+import { addEmailToQueue } from '../../../lib/emailQueue';
 import { generateReportHtml } from '../../../lib/templates/report_template';
-import { withSecurity } from '../../../lib/security/middleware';
 
 /**
  * Handles the generation and emailing of the financial leak report.
@@ -54,12 +53,12 @@ async function handler(req, res) {
 
     // For MVP, just email HTML report
     // In production, use puppeteer to generate PDF
-    await resend.emails.send({
-      from: process.env.FROM_EMAIL,
-      to: audit.email,
-      subject: `💰 Your SaaS Leak Report: $${audit.total_waste_found?.toLocaleString() || '0'} Found`,
-      html: reportHtml,
-    });
+    await addEmailToQueue(
+      audit.email,
+      process.env.FROM_EMAIL,
+      `💰 Your SaaS Leak Report: $${audit.total_waste_found?.toLocaleString() || '0'} Found`,
+      reportHtml
+    );
 
     // Update audit with report sent status
     await supabase
