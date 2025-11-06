@@ -9,13 +9,13 @@ import supabase from '../../../lib/services/supabase';
 import { withValidation } from '../../../lib/security/middleware';
 import { APIOptimizer } from '../../../lib/optimization/apiOptimizer';
 import { ErrorHandler } from '../../../lib/errors/errorHandler';
-import CircuitBreaker from '../../../lib/errors/circuitBreaker';
+import PersistentCircuitBreaker from '../../../lib/errors/PersistentCircuitBreaker';
 
 const fetchTransactionsSchema = Joi.object({
   auditId: Joi.string().uuid().required(),
 });
 
-const plaidCircuit = new CircuitBreaker(APIOptimizer.fetchTransactionsOptimized);
+const plaidCircuit = new PersistentCircuitBreaker('plaid_api', APIOptimizer.fetchTransactionsOptimized);
 
 /**
  * @fileoverview This API endpoint is responsible for fetching a user's transaction history from Plaid.

@@ -6,9 +6,8 @@
 import { buffer } from 'micro';
 import stripe from '../../../lib/services/stripe';
 import supabase from '../../../lib/services/supabase';
-import resend from '../../../lib/services/resend';
+import { addEmailToQueue } from '../../../lib/emailQueue';
 import { generateWelcomeEmailHtml } from '../../../lib/templates/welcome_email_template';
-import { withSecurity } from '../../../lib/security/middleware';
 
 export const config = {
   api: {
@@ -77,12 +76,12 @@ async function handler(req, res) {
         process.env.NEXT_PUBLIC_APP_URL
       );
 
-      await resend.emails.send({
-        from: process.env.FROM_EMAIL,
-        to: userEmail,
-        subject: 'Welcome to LeakDetector - Next Steps',
-        html: welcomeHtml,
-      });
+      await addEmailToQueue(
+        userEmail,
+        process.env.FROM_EMAIL,
+        'Welcome to LeakDetector - Next Steps',
+        welcomeHtml
+      );
     } catch (emailError) {
       console.error('Failed to send welcome email:', emailError);
     }

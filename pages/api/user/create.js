@@ -4,7 +4,7 @@
  * This is the first step in the user onboarding process.
  */
 import supabase from '../../../lib/services/supabase';
-import resend from '../../../lib/services/resend';
+import { addEmailToQueue } from '../../../lib/emailQueue';
 import { withValidation } from '../../../lib/security/middleware';
 import Joi from 'joi';
 
@@ -63,12 +63,12 @@ async function handler(req, res) {
 
   // Send welcome email with payment link
   try {
-    await resend.emails.send({
-      from: 'onboarding@leakdetector.com',
-      to: email,
-      subject: 'Welcome to LeakDetector!',
-      html: `<p>Welcome to LeakDetector! Please <a href="${paymentLink}">click here to complete payment</a> and start your audit.</p>`,
-    });
+    await addEmailToQueue(
+      email,
+      'onboarding@leakdetector.com',
+      'Welcome to LeakDetector!',
+      `<p>Welcome to LeakDetector! Please <a href="${paymentLink}">click here to complete payment</a> and start your audit.</p>`
+    );
   } catch (emailError) {
     console.error('Error sending welcome email:', emailError);
     // Note: The user and audit have been created, so we don't want to fail the request here.

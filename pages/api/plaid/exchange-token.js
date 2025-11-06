@@ -7,7 +7,7 @@
 import Joi from 'joi';
 import plaidClient from '../../../lib/services/plaid';
 import supabase from '../../../lib/services/supabase';
-import resend from '../../../lib/services/resend';
+import { addEmailToQueue } from '../../../lib/emailQueue';
 import { withValidation } from '../../../lib/security/middleware';
 
 const exchangeTokenSchema = Joi.object({
@@ -70,14 +70,14 @@ async function handler(req, res) {
     }
 
     // Send confirmation email
-    if (audit && audit.user && audit.user.email) {
+    if (audit && audit.email) {
       try {
-        await resend.emails.send({
-          from: 'support@leakdetector.com',
-          to: audit.user.email,
-          subject: 'Bank Account Connected!',
-          html: '<p>Your bank account has been successfully connected. We are now analyzing your transactions.</p>',
-        });
+        await addEmailToQueue(
+          audit.email,
+          'support@leakdetector.com',
+          'Bank Account Connected!',
+          '<p>Your bank account has been successfully connected. We are now analyzing your transactions.</p>'
+        );
       } catch (emailError) {
         console.error('Error sending confirmation email:', emailError);
       }
