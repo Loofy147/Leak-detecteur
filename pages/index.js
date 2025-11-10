@@ -83,10 +83,6 @@ export default function LeakDetectorLanding() {
             <span className="text-2xl md:text-4xl text-gray-600">in 24 Hours</span>
           </h1>
           
-          <a href="/dashboard" className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-lg transition-colors">
-            Go to Dashboard
-          </a>
-
           <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
             Most companies waste <strong>30% of their software budget</strong> on unused licenses, 
             duplicate tools, and forgotten subscriptions. We find them. You cancel them.

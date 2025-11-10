@@ -5,9 +5,10 @@ import Dashboard from './dashboard';
 
 describe('Dashboard', () => {
   it('renders a welcome message', () => {
-    render(<Dashboard />);
+    const user = { email: 'test@example.com' };
+    render(<Dashboard user={user} />);
     expect(
-      screen.getByText('Welcome to your subscription management dashboard.')
+      screen.getByText('Welcome, test@example.com!')
     ).toBeInTheDocument();
   });
 });
