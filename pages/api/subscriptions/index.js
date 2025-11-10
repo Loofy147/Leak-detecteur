@@ -27,5 +27,14 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  res.status(200).json(user);
+  const { data: subscriptions, error: subscriptionsError } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('user_id', user.id);
+
+  if (subscriptionsError) {
+    return res.status(500).json({ error: subscriptionsError.message });
+  }
+
+  res.status(200).json(subscriptions);
 }
